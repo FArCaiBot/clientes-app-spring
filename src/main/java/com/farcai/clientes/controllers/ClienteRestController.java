@@ -7,12 +7,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import javax.validation.Valid;
+import java.util.*;
 
 @Tag(name = "CRUD Cliente", description = "Operaciones crud de clientes")
 @CrossOrigin(origins = {"http://localhost:4200"})
@@ -39,7 +38,6 @@ public class ClienteRestController {
             response.put("mensaje", "Error al realizar la consulta en la base de datos!");
             response.put("error", e.getMessage().concat(": ").concat(e.getMostSpecificCause().getMessage()));
             return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-
         }
         if (cliente == null) {
             response.put("mensaje", "El cliente ID: ".concat(id.toString()).concat(" no existe en la base de datos!"));
@@ -51,10 +49,19 @@ public class ClienteRestController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ResponseEntity<?> create(@RequestBody Cliente cliente) {
+    public ResponseEntity<?> create(@Valid @RequestBody Cliente cliente, BindingResult result) {
         cliente.setCreateAt(new Date());
         Cliente clienteNew = null;
         Map<String, Object> response = new HashMap<>();
+
+        if (result.hasErrors()) {
+            response.put("errors",
+                    result.getFieldErrors().stream()
+                            .map(fieldError ->
+                                    "El campo " + fieldError.getField() + " " + fieldError.getDefaultMessage())
+            );
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
 
         try {
             clienteNew = clienteService.save(cliente);
@@ -69,12 +76,22 @@ public class ClienteRestController {
     }
 
     @PutMapping("/{idCliente}")
-    public ResponseEntity<?> update(@PathVariable(name = "idCliente") Long id, @RequestBody Cliente cliente) {
+    public ResponseEntity<?> update(@PathVariable(name = "idCliente") Long id,
+                                    @Valid @RequestBody Cliente cliente,
+                                    BindingResult result) {
         Cliente clienteActual = clienteService.findById(id);
         Cliente clienteUpdated = null;
 
         Map<String, Object> response = new HashMap<>();
 
+        if (result.hasErrors()) {
+            response.put("errors",
+                    result.getFieldErrors().stream()
+                            .map(fieldError ->
+                                    "El campo " + fieldError.getField() + " " + fieldError.getDefaultMessage())
+            );
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
         if (clienteActual == null) {
             response.put("mensaje", "Error: no se pudo editar, el cliente ID: ".concat(id.toString()).concat(" no existe en la base de datos!"));
             return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
@@ -100,7 +117,6 @@ public class ClienteRestController {
     public ResponseEntity<?> delete(@PathVariable(name = "idCliente") Long id) {
         Map<String, Object> response = new HashMap<>();
         try {
-
             clienteService.delete(id);
         } catch (DataAccessException e) {
             response.put("mensaje", "Error al eliminar el cliente en la base de datos!");
